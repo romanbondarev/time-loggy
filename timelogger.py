@@ -36,14 +36,17 @@ def sync(data: dict):
 
 
 def sync_cloud(data: dict):
-    time_logs_collection = firestore.client().collection(f'users/{os.getenv(TIMELOGGY_USER)}/timelogs')
+    db = firestore.client()
+    batch = db.batch()
+    time_logs_collection = db.collection(f'users/{os.getenv(TIMELOGGY_USER)}/timelogs')
     for key, value in data.items():
         print(key, value)
-        time_logs_collection.document(key).set(value)
+        batch.set(time_logs_collection.document(key), value)
 
         for project in value['projects']:
             print(f'\t{project}')
-            time_logs_collection.document(key).collection('projects').document(project['name']).set(project)
+            batch.set(time_logs_collection.document(key).collection('projects').document(project['name']), project)
+    batch.commit()
 
 
 def get_current_data(start=None, end=None):
