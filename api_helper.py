@@ -19,10 +19,12 @@ class ApiHelper:
             f"start={start_date.strftime('%Y-%m-%d')}&" \
             f"end={end_date.strftime('%Y-%m-%d')}"
 
+        print(f'## sending request to {url}')
         response = requests.get(url, headers={'cookie': self.cookie})
         return ApiHelper.handle_response(response, url)
 
     def get_share_data(self):
+        print(f'## sending request to {self.share_url}')
         response = requests.get(self.share_url)
         return ApiHelper.handle_response(response, self.share_url)
 
@@ -34,12 +36,11 @@ class ApiHelper:
 
     @staticmethod
     def parse_api_data(response: dict):
+        print('## parsing API data')
         data = ApiHelper.get_data(response)
         data = filter(lambda x: len(x['categories']) > 0, data)
         time_logs = {datum['range']['date']: {
             'date': ApiHelper.to_date(datum['range']['date']),  # date
-            'start': ApiHelper.to_date(datum['range']['start']),  # date
-            'end': ApiHelper.to_date(datum['range']['end']),  # date
             'text': datum['categories'][0]['text'],  # string
             'total_seconds': datum['categories'][0]['total_seconds'],  # number
             'projects': [{
@@ -53,12 +54,11 @@ class ApiHelper:
 
     @staticmethod
     def parse_share_data(response: dict):
+        print('Parsing share data')
         data = ApiHelper.get_data(response)
 
         return {datum['range']['date']: {
             'date': ApiHelper.to_date(datum['range']['date'], '%Y-%m-%d'),  # date
-            'start': ApiHelper.to_date(datum['range']['start']),  # date
-            'end': ApiHelper.to_date(datum['range']['end']),  # date
             'text': datum['grand_total']['text'],  # string
             'total_seconds': datum['grand_total']['total_seconds']  # number
         } for datum in data}

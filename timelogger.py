@@ -1,6 +1,6 @@
 import os
-from datetime import datetime
 from pathlib import Path
+from datetime import date, datetime, timedelta
 
 import firebase_admin
 from dotenv import load_dotenv
@@ -12,6 +12,7 @@ from constants import *
 
 
 def init_env():
+    print('Setting up environment...')
     env_path = Path('.') / '.env'
     load_dotenv(dotenv_path=env_path)
 
@@ -26,6 +27,7 @@ def init_env():
 
 
 def init_firestore():
+    print('Initializing firestore...')
     cred = credentials.Certificate(os.getenv(TIMELOGGY_FIRESTORE_CONFIG_URL))
     firebase_admin.initialize_app(cred)
 
@@ -36,8 +38,10 @@ def sync(data: dict):
 
 
 def sync_cloud(data: dict):
+    print('## syncing to firestore')
     db = firestore.client()
     batch = db.batch()
+
     time_logs_collection = db.collection(f'users/{os.getenv(TIMELOGGY_USER)}/timelogs')
     for key, value in data.items():
         print(key, value)
@@ -46,6 +50,7 @@ def sync_cloud(data: dict):
         for project in value['projects']:
             print(f'\t{project}')
             batch.set(time_logs_collection.document(key).collection('projects').document(project['name']), project)
+
     batch.commit()
 
 
@@ -61,26 +66,32 @@ def get_current_data(start=None, end=None):
 
 
 def prettify(time_logs: firestore.firestore.CollectionReference):
-    print(f'\nInfo for current user {os.getenv(TIMELOGGY_USER)}')
+    print(f'Info for current user {os.getenv(TIMELOGGY_USER)}')
     for log in time_logs.stream():
-        print(f'Spent {log.to_dict()["text"]} on '
+        day = log.to_dict()
+
+        print(f'\nSpent {day["text"]} on '
               f'{datetime.strftime(datetime.strptime(log.id, "%Y-%m-%d"), "%d.%m.%Y")} doing:')
 
-        projects = sorted(time_logs.document(log.id).collection('projects').stream(),
-                          key=lambda x: x.to_dict()['total_seconds'], reverse=True)
+        projects = day['projects'] if 'projects' in day else []
+        sorted_projects = sorted(projects, key=lambda x: x['total_seconds'], reverse=True)
 
-        for project in projects:
-            print(f'\t{project.to_dict()["name"]} for {project.to_dict()["text"]}')
+        for project in sorted_projects:
+            print(f'\t- {project["name"]} for {project["text"]}')
 
 
 if __name__ == '__main__':
     init_env()
     init_firestore()
 
+    print()
     api_helper = ApiHelper()
-
     resp_body = api_helper.get_api_data(datetime.today())
     data = api_helper.parse_api_data(resp_body)
 
+    print()
     sync(data)
-    # prettify(get_current_data())
+
+    print()
+    start = date.today() - timedelta(days=7)
+    prettify(get_current_data(start.isoformat()))
